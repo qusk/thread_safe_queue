@@ -1,5 +1,7 @@
 #ifndef _QTYPE_H  // header guard
 #define _QTYPE_H
+#include <mutex>
+#define MAX_SIZE 100000
 
 // ==========이 파일은 수정 가능==========
 
@@ -24,10 +26,13 @@ typedef struct node_t {
 } Node;
 
 typedef struct {
-    Node* head, tail;
-    // 필드 추가 가능
+    Item data[MAX_SIZE];
+    int size;
+    std::mutex lock;
 } Queue;
 
 // 이후 자유롭게 추가/수정: 새로운 자료형 정의 등
+
+
 
 #endif
