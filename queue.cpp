@@ -8,12 +8,17 @@ inline int left(int i) { return 2 * i + 1; }
 inline int right(int i) { return 2 * i + 2; }
 
 Queue* init(void) {
-	Queue* queue = new Queue();
+	Queue* queue = new Queue;
+	queue->size = 0;
 	return queue;
 }
 
 
 void release(Queue* queue) {
+	for(int i = 0; i < queue->size; ++i) {
+		free(queue->data[i].value);
+	}
+
 	delete queue;
 }
 
@@ -21,14 +26,18 @@ void release(Queue* queue) {
 Node* nalloc(Item item) {
 	// Node 생성 Item으로로 초기화
 	Node* node = new Node();
-	node->item = item;
+	node->item.key = item.key;
+	node->item.value = item.value;
+	node->item.value_size = item.value_size;
+	node->item.value = malloc(item.value_size);
+	memcpy(node->item.value, item.value, item.value_size);
 	node->next = nullptr;
-	
 	return node;
 }
 
 
 void nfree(Node* node) {
+	free(node->item.value);
 	delete node;
 }
 

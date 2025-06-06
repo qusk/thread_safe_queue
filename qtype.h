@@ -11,6 +11,7 @@ typedef void* Value;
 typedef struct {
     Key key;
     Value value;
+    int value_size;
 } Item;
 
 typedef struct {
