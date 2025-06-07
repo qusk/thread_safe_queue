@@ -50,12 +50,27 @@ Node* nclone(Node* node) {
 Reply enqueue(Queue* queue, Item item) {
 	lock_guard<mutex> lock(queue->lock);
 
+	// 중복된 key가 들어오면 새로운 key값으로 덮어쓰기
+	for(int i = 0; i < queue->size; ++i) {
+		if(queue->data[i].key == item.key) {
+			free(queue->data[i].value);
+			queue->data[i].value = malloc(item.value_size);
+			memcpy(queue->data[i].value, item.value, item.value_size);
+			queue->data[i].value_size = item.value_size;
+			return { true, item };
+		}
+	}
+
 	if (queue->size >= MAX_SIZE) {
 		return { false, item };
 	}
 
 	int i = queue->size++;
-	queue->data[i] = item;
+	queue->data[i].key = item.key;
+	queue->data[i].value = malloc(item.value_size);
+	queue->data[i].value_size = item.value_size;
+	memcpy(queue->data[i].value, item.value, item.value_size);
+
 	while(i > 0 && queue->data[parent(i)].key < queue->data[i].key) {
 		// 부모 노드와 비교하여 우선순위가 낮으면 교환
 		swap(queue->data[i], queue->data[parent(i)]);
@@ -73,6 +88,13 @@ Reply dequeue(Queue* queue) {
 	}
 
 	Item top = queue->data[0];
+	Item top_copy;
+	top_copy.key = top.key;
+	top_copy.value_size = top.value_size;
+	top_copy.value = malloc(top_copy.value_size);
+	memcpy(top_copy.value, top.value, top_copy.value_size);
+
+	free(queue->data[0].value);
 	queue->data[0] = queue->data[--queue->size];
 
 	int i = 0;
@@ -93,7 +115,7 @@ Reply dequeue(Queue* queue) {
 		i = largest;
 	}
 
-	return { true, top };
+	return { true, top_copy };
 }
 
 Queue* range(Queue* queue, Key start, Key end) {
