@@ -1,4 +1,6 @@
 #include <iostream>
+#include <cstdlib>
+#include <cstring>
 #include "queue.h"
 
 using namespace std;
@@ -73,7 +75,10 @@ Reply enqueue(Queue* queue, Item item) {
 
 	while(i > 0 && queue->data[parent(i)].key < queue->data[i].key) {
 		// 부모 노드와 비교하여 우선순위가 낮으면 교환
-		swap(queue->data[i], queue->data[parent(i)]);
+		Item temp = queue->data[i];
+		queue->data[i] = queue->data[parent(i)];
+		queue->data[parent(i)] = temp;
+
 		i = parent(i);
 	}
 
@@ -111,7 +116,10 @@ Reply dequeue(Queue* queue) {
 		if(largest == i) {
 			break; // 더 이상 교환할 필요 없음
 		}
-		swap(queue->data[i], queue->data[largest]);
+		Item temp = queue->data[i];
+		queue->data[i] = queue->data[largest];
+		queue->data[largest] = temp;
+
 		i = largest;
 	}
 
@@ -119,5 +127,25 @@ Reply dequeue(Queue* queue) {
 }
 
 Queue* range(Queue* queue, Key start, Key end) {
-	return NULL;
+	lock_guard<mutex> gurad(queue->lock);
+
+	Queue* newQueue = new Queue;
+	newQueue->size = 0;
+
+	for(int i = 0; i < queue->size; ++i) {
+		if(queue->data[i].key >= start && queue->data[i].key <= end) {
+			if(newQueue->size >= MAX_SIZE) {
+				break;
+			}
+
+			int index = newQueue->size++;
+			newQueue->data[index].key = queue->data[i].key;
+			newQueue->data[index].value_size = queue->data[i].value_size;
+
+			newQueue->data[index].value = malloc(queue->data[i].value_size);
+			memcpy(newQueue->data[index].value, queue->data[i].value, queue->data[i].value_size);
+		}
+	}
+
+	return newQueue;
 }
