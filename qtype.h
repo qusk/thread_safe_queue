@@ -1,6 +1,9 @@
 #ifndef _QTYPE_H  // header guard
 #define _QTYPE_H
 #include <mutex>
+#include <condition_variable>
+
+
 #define MAX_SIZE 100000
 
 // ==========이 파일은 수정 가능==========
@@ -30,6 +33,7 @@ typedef struct {
     Item data[MAX_SIZE];
     int size;
     std::mutex lock;
+    std::condition_variable cv;
 } Queue;
 
 // 이후 자유롭게 추가/수정: 새로운 자료형 정의 등
