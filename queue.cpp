@@ -17,8 +17,11 @@ Queue* init(void) {
 
 
 void release(Queue* queue) {
+	lock_guard<mutex> guard(queue->lock);
 	for(int i = 0; i < queue->size; ++i) {
-		free(queue->data[i].value);
+		if(queue->data[i].value)
+			free(queue->data[i].value);
+			queue->data[i].value = nullptr;
 	}
 
 	delete queue;
@@ -50,7 +53,7 @@ Node* nclone(Node* node) {
 
 
 Reply enqueue(Queue* queue, Item item) {
-	lock_guard<mutex> lock(queue->lock);
+	unique_lock<mutex> lock(queue->lock);
 
 	// 중복된 key가 들어오면 새로운 key값으로 덮어쓰기
 	for(int i = 0; i < queue->size; ++i) {
@@ -127,7 +130,7 @@ Reply dequeue(Queue* queue) {
 }
 
 Queue* range(Queue* queue, Key start, Key end) {
-	lock_guard<mutex> gurad(queue->lock);
+	lock_guard<mutex> guard(queue->lock);
 
 	Queue* newQueue = new Queue;
 	newQueue->size = 0;
