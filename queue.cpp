@@ -58,8 +58,10 @@ Reply enqueue(Queue* queue, Item item) {
 	// 중복된 key가 들어오면 새로운 key값으로 덮어쓰기
 	for(int i = 0; i < queue->size; ++i) {
 		if(queue->data[i].key == item.key) {
+			void* allocated_value = malloc(item.value_size);
+			if(!allocated_value) return { false, item }; // 할당 가능 여부 확인인
 			free(queue->data[i].value);
-			queue->data[i].value = malloc(item.value_size);
+			queue->data[i].value = allocated_value;
 			memcpy(queue->data[i].value, item.value, item.value_size);
 			queue->data[i].value_size = item.value_size;
 			return { true, item };
@@ -70,14 +72,18 @@ Reply enqueue(Queue* queue, Item item) {
 		return { false, item };
 	}
 
+	void* allocated_value = malloc(item.value_size);
+	if(!allocated_value) return { false, item };
+
+
 	int i = queue->size++;
 	queue->data[i].key = item.key;
-	queue->data[i].value = malloc(item.value_size);
+	queue->data[i].value = allocated_value;
 	queue->data[i].value_size = item.value_size;
 	memcpy(queue->data[i].value, item.value, item.value_size);
 
+	// 크기 비교 후 교환작업
 	while(i > 0 && queue->data[parent(i)].key < queue->data[i].key) {
-		// 부모 노드와 비교하여 우선순위가 낮으면 교환
 		Item temp = queue->data[i];
 		queue->data[i] = queue->data[parent(i)];
 		queue->data[parent(i)] = temp;
@@ -85,26 +91,29 @@ Reply enqueue(Queue* queue, Item item) {
 		i = parent(i);
 	}
 
+	lock.unlock();
+	queue->cv.notify_one();
+
 	return { true, item };
 }
 
 Reply dequeue(Queue* queue) {
-	lock_guard<mutex> lock(queue->lock);
+	unique_lock<mutex> lock(queue->lock);
 
-	if(queue->size == 0) {
-		return { false, {0, nullptr} };
-	}
+	queue->cv.wait(lock, [&]() { return queue->size > 0; });
 
 	Item top = queue->data[0];
-	Item top_copy;
-	top_copy.key = top.key;
-	top_copy.value_size = top.value_size;
-	top_copy.value = malloc(top_copy.value_size);
-	memcpy(top_copy.value, top.value, top_copy.value_size);
+	
+	// 최상위 노드 복제 후 해제
+	void* top_copy = malloc(top.value_size);
+	if(!top_copy) return { false, {0, nullptr, 0} };
+	
+	memcpy(top_copy, top.value, top.value_size);
 
 	free(queue->data[0].value);
 	queue->data[0] = queue->data[--queue->size];
 
+	// maxheap 구조 유지를 위한 과정
 	int i = 0;
 	while(true) {
 		int largest = i;
@@ -126,7 +135,10 @@ Reply dequeue(Queue* queue) {
 		i = largest;
 	}
 
-	return { true, top_copy };
+	lock.unlock();
+
+
+	return { true, {top.key, top_copy, top.value_size} };
 }
 
 Queue* range(Queue* queue, Key start, Key end) {
