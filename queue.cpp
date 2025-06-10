@@ -142,25 +142,52 @@ Reply dequeue(Queue* queue) {
 }
 
 Queue* range(Queue* queue, Key start, Key end) {
-	lock_guard<mutex> guard(queue->lock);
+	
+  // 임시 보관
+	Item temp_items[MAX_SIZE];
+	int temp_count = 0;
+	
+	// start와 end 사이의 값 찾아서 임시 보관소에 넣는 과정정
+	{
+		lock_guard<mutex> guard(queue->lock);
+		for(int i = 0; i < queue->size; ++i) {
+			Key key = queue->data[i].key;
+			if(key >= start && key <= end) {
+				if(temp_count >= MAX_SIZE) break;
 
-	Queue* newQueue = new Queue;
-	newQueue->size = 0;
+				void* copy_data = malloc(queue->data[i].value_size);
+				if(!copy_data) {
+					for(int j = 0; j < temp_count; ++j) { free(temp_items[j].value); }
+					return nullptr;
+				}
 
-	for(int i = 0; i < queue->size; ++i) {
-		if(queue->data[i].key >= start && queue->data[i].key <= end) {
-			if(newQueue->size >= MAX_SIZE) {
-				break;
+				temp_items[temp_count].key = key;
+				temp_items[temp_count].value_size = queue->data[i].value_size;
+				temp_items[temp_count].value = copy_data;
+				memcpy(copy_data, queue->data[i].value, queue->data[i].value_size);
+				temp_count++;
 			}
+		}
+	}
+	
+	Queue* new_queue = init();
+	for(int i = 0; i < temp_count; ++i) {
+		if(new_queue->size >= MAX_SIZE) {
+			free(temp_items[i].value);
+			continue;
+		}
 
-			int index = newQueue->size++;
-			newQueue->data[index].key = queue->data[i].key;
-			newQueue->data[index].value_size = queue->data[i].value_size;
+		int j = new_queue->size++;
+		new_queue->data[j] = temp_items[i];
 
-			newQueue->data[index].value = malloc(queue->data[i].value_size);
-			memcpy(newQueue->data[index].value, queue->data[i].value, queue->data[i].value_size);
+		// MAX_heap 만드는 과정
+		while(j > 0 && new_queue->data[parent(j)].key < new_queue->data[j].key) {
+			Item temp = new_queue->data[j];
+			new_queue->data[j] = new_queue->data[parent(j)];
+			new_queue->data[parent(j)] = temp;
+			j = parent(j);
 		}
 	}
 
-	return newQueue;
+	return new_queue;
 }
