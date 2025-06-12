@@ -30,10 +30,9 @@ typedef struct node_t {
 } Node;
 
 typedef struct {
-    Item data[MAX_SIZE];
-    int size;
+    Node* head;
+    Node* tail;
     std::mutex lock;
-    std::condition_variable cv;
 } Queue;
 
 // 이후 자유롭게 추가/수정: 새로운 자료형 정의 등
