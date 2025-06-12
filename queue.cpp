@@ -5,6 +5,7 @@
 
 using namespace std;
 
+// 힙을 만들기 위한 간단한 함수들
 inline int parent(int i) { return (i - 1) / 2; }
 inline int left(int i) { return 2 * i + 1; }
 inline int right(int i) { return 2 * i + 2; }
@@ -29,7 +30,7 @@ void release(Queue* queue) {
 
 
 Node* nalloc(Item item) {
-	// Node 생성 Item으로로 초기화
+	// Node 생성 Item으로 초기화
 	Node* node = new Node();
 	node->item.key = item.key;
 	node->item.value = item.value;
@@ -59,7 +60,7 @@ Reply enqueue(Queue* queue, Item item) {
 	for(int i = 0; i < queue->size; ++i) {
 		if(queue->data[i].key == item.key) {
 			void* allocated_value = malloc(item.value_size);
-			if(!allocated_value) return { false, item }; // 할당 가능 여부 확인인
+			if(!allocated_value) return { false, item }; // 메모리 할당 가능 여부 확인
 			free(queue->data[i].value);
 			queue->data[i].value = allocated_value;
 			memcpy(queue->data[i].value, item.value, item.value_size);
@@ -72,6 +73,7 @@ Reply enqueue(Queue* queue, Item item) {
 		return { false, item };
 	}
 
+	// 메모리 할당 가능 여부 확인
 	void* allocated_value = malloc(item.value_size);
 	if(!allocated_value) return { false, item };
 
@@ -113,7 +115,7 @@ Reply dequeue(Queue* queue) {
 	free(queue->data[0].value);
 	queue->data[0] = queue->data[--queue->size];
 
-	// maxheap 구조 유지를 위한 과정
+	// MAX_Heap 구조 유지를 위한 과정
 	int i = 0;
 	while(true) {
 		int largest = i;
@@ -143,11 +145,11 @@ Reply dequeue(Queue* queue) {
 
 Queue* range(Queue* queue, Key start, Key end) {
 	
-  // 임시 보관
+  // 임시 보관 배열
 	Item temp_items[MAX_SIZE];
 	int temp_count = 0;
 	
-	// start와 end 사이의 값 찾아서 임시 보관소에 넣는 과정정
+	// start와 end 사이의 값 찾아서 temp_items에 넣음
 	{
 		lock_guard<mutex> guard(queue->lock);
 		for(int i = 0; i < queue->size; ++i) {
@@ -180,7 +182,7 @@ Queue* range(Queue* queue, Key start, Key end) {
 		int j = new_queue->size++;
 		new_queue->data[j] = temp_items[i];
 
-		// MAX_heap 만드는 과정
+		// MAX_heap 구조 유지를 위한 과정
 		while(j > 0 && new_queue->data[parent(j)].key < new_queue->data[j].key) {
 			Item temp = new_queue->data[j];
 			new_queue->data[j] = new_queue->data[parent(j)];
