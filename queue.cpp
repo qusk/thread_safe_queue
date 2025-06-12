@@ -74,55 +74,61 @@ Reply enqueue(Queue* queue, Item item) {
 	node->item.value_size = item.value_size;
 	node->next = nullptr;
 
-	lock_guard<mutex> lock(queue->lock);
+	{
+		lock_guard<mutex> lock(queue->lock);
 
-	Node* prev = nullptr;
-	Node* current = queue->head;
+		Node* prev = nullptr;
+		Node* current = queue->head;
 
-	while(current) {
-		if(current->item.key == item.key) {
-			free(current->item.value);
-			current->item.value = value_copy;
-			current->item.value_size = item.value_size;
-			delete node;
-			return {true, current->item};
+		while(current) {
+			if(current->item.key == item.key) {
+				free(current->item.value);
+				current->item.value = value_copy;
+				current->item.value_size = item.value_size;
+				delete node;
+				return {true, item};
+			}
+			if(current->item.key < item.key) break;
+			prev = current;
+			current = current->next;
 		}
-		if(current->item.key < item.key) break;
-		prev = current;
-		current = current->next;
+
+		if(!prev) {
+			node->next = queue->head;
+			queue->head = node;
+			if(!queue->tail) queue->tail = node;
+		} else {
+			node->next = prev->next;
+			prev->next = node;
+			if(!node->next) queue->tail = node;
+		}
 	}
 
-	if(!prev) {
-		node->next = queue->head;
-		queue->head = node;
-		if(!queue->tail)  queue->tail = node; 
-	} else{
-		node->next = prev->next;
-		prev->next = node;
-		if(!node->next) queue->tail = node;
-	}
 	return {true, node->item};
 }
 
 Reply dequeue(Queue* queue) {
-	lock_guard<mutex> lock(queue->lock);
+	Node* node;
+	
+	{
+		lock_guard<mutex> lock(queue->lock);
+		if(!queue->head) return {false, {0, nullptr, 0}};
 
-	if(!queue->head) return {false, {0, nullptr, 0}};
+		node = queue->head;
+		queue->head = node->next;
+		if(queue->head) queue->tail = node;
+	}
 
-	Node* node = queue->head;
-	queue->head = node->next;
-	if(!queue->head) queue->tail = nullptr;
-
-	Item item;
-	item.key = node->item.key;
-	item.value_size = node->item.value_size;
-	item.value = malloc(item.value_size);
-	memcpy(item.value, node->item.value, item.value_size);
+	Item return_val;
+	return_val.key = node->item.key;
+	return_val.value_size = node->item.value_size;
+	return_val.value = malloc(return_val.value_size);
+	memcpy(return_val.value, node->item.value, return_val.value_size);
 
 	free(node->item.value);
 	delete node;
 
-	return {true, item};
+	return {true, return_val};
 }
 
 Queue* range(Queue* queue, Key start, Key end) {
