@@ -12,7 +12,29 @@ Queue* init(void) {
 
 	return queue;
 }
+// 노드를 모아놓는 pool
+static Node* node_pool = nullptr;
+static mutex pool_lock;
 
+// pool로 node를 할당하는 함수
+static Node* pool_allocate() {
+	lock_guard<mutex> pl(pool_lock);
+	
+	if(node_pool) {
+		Node* n = node_pool;
+		node_pool = node_pool->next;
+		return n;
+	}
+	return new Node;
+}
+
+// 풀 안으로 노드를 반환하는 함수
+static void pool_free(Node* node) {
+	lock_guard<mutex> fl(pool_lock);
+
+	node->next = node_pool;
+	node_pool = node;
+}
 
 void release(Queue* queue) {
 	{
@@ -22,11 +44,21 @@ void release(Queue* queue) {
 		while(current) {
 			Node* next = current->next;
 			free(current->item.value);
-			delete current;
+			pool_free(current);
 			current = next;
 		}
 	}
 	delete queue;
+
+	// pool 비우기
+	{
+		lock_guard<mutex> pl(pool_lock);
+		while(node_pool) {
+			Node* next = node_pool->next;
+			delete node_pool;
+			node_pool = next;
+		}
+	}
 }
 
 
@@ -69,7 +101,7 @@ Reply enqueue(Queue* queue, Item item) {
 	memcpy(value_copy, item.value, item.value_size);
 
 	// 노드 생성
-	Node* node = new Node;
+	Node* node = pool_allocate();
 	node->item.key = item.key;
 	node->item.value = value_copy;
 	node->item.value_size = item.value_size;
@@ -87,7 +119,7 @@ Reply enqueue(Queue* queue, Item item) {
 				free(current->item.value);
 				current->item.value = value_copy;
 				current->item.value_size = item.value_size;
-				delete node;
+				pool_free(node);
 				return {true, item};
 			}
 			if(current->item.key < item.key) break;
@@ -129,7 +161,7 @@ Reply dequeue(Queue* queue) {
 	memcpy(return_val.value, node->item.value, return_val.value_size);
 
 	free(node->item.value);
-	delete node;
+	pool_free(node);
 
 	return {true, return_val};
 }
@@ -177,7 +209,7 @@ Queue* range(Queue* queue, Key start, Key end) {
 		if(!temp_size) break;
 		memcpy(temp_size, temp[i].ptr, temp[i].size);
 
-		Node* node = new Node;
+		Node* node = pool_allocate();
 		node->item.key = temp[i].key;
 		node->item.value_size = temp[i].size;
 		node->item.value = temp_size;
